@@ -4,17 +4,21 @@
  * was just accessed. It also ignores requests to blocks already in the cache.
  */
 
+// Debug command (TODO REMOVE)
+// make && clear && ./build/ALPHA_SE/m5.opt /opt/prefetcher/m5/configs/example/se.py --detailed --caches --l2cache --l2size=1MB
+// --prefetcher=policy=proxy --prefetcher=on_access=True
+
 #include "interface.hh"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#define SIZE 64
-#define GHB_SIZE 64
-#define IT_SIZE 64
+#define GHB_SIZE 512
+#define IT_SIZE 512
 
-#define WIDTH 1
-#define DEPTH 2
+#define WIDTH 16
+#define DEPTH 16
+#define DEGREE 32
 
 // Global History Buffer (GHB) Entry
 struct ghb_entry {
@@ -50,6 +54,25 @@ void prefetch_init(void) {
     for (int i = 0; i < IT_SIZE; ++i) {
         it[i].ghb_index = -1;
     }
+}
+
+// Calculates a delta value
+int calculate_delta(int index) {
+
+    // Stops if one of the entries is the head
+    if (index == head_index || index + 1 == head_index)
+        return -1;
+
+    // Gets the GHB entries
+    ghb_entry a = ghb[(index) % GHB_SIZE];
+    ghb_entry b = ghb[(index + 1) % GHB_SIZE];
+
+    // Returns -1 if not valid entries
+    if (!a.valid || !b.valid)
+        return -1;
+
+    // Return the delta value
+    return b.adr - a.adr;
 }
 
 it_entry access_it(int delta) { return it[abs((delta / 64) % IT_SIZE)]; }
@@ -96,6 +119,7 @@ ghb_entry add_ghb_entry(Addr adr, int delta) {
 }
 
 void prefetch_access(AccessStat stat) {
+    // printf("Hello, I am done");
     if (!stat.miss)
         return;
 
@@ -105,34 +129,54 @@ void prefetch_access(AccessStat stat) {
     // Adds the ghb entry (updates the GHB and IT)
     ghb_entry node = add_ghb_entry(stat.mem_addr, delta);
 
+    int prefetched_addresses = 0;
+
     for (int i = 0; i < WIDTH; ++i) {
         if (node.prev < 0)
             continue;
 
+        // Gets the next node
         int current_index = node.prev;
-
-        printf("%d\n", current_index);
-        node = ghb[current_index];
+        node              = ghb[current_index];
 
         Addr pf_addr = stat.mem_addr;
 
         for (int j = 0; j < DEPTH; ++j) {
 
-            // Calculates and adds the delta to the miss address
-            delta = ghb[current_index + j + 1].adr - ghb[current_index + j].adr;
-            pf_addr += delta;
+            // Calculates the delta value
+            delta = calculate_delta(current_index + j);
 
-            // Stops if address is too large
-            if (pf_addr > MAX_PHYS_MEM_ADDR)
+            // Stops if no more nodes
+            if (delta == -1)
+                break;
+
+            // Continues if address is too large
+            if (pf_addr + delta > MAX_PHYS_MEM_ADDR || pf_addr + delta < 0)
                 continue;
 
-            // Issue a prefetch request if a demand miss occurred, and the block is not already in cache.
-            if (!in_cache(pf_addr))
+            // Adds the delta to the miss address
+            pf_addr += delta;
+
+            // printf("%d\n", current_index + j);
+
+            // Issue a prefetch request if the address is not already in cache
+            if (!in_cache(pf_addr)) {
+                ++prefetched_addresses;
                 issue_prefetch(pf_addr);
+            }
 
             // Gets the next node
-            node = ghb[current_index + j];
+            node = ghb[(current_index + j) % GHB_SIZE];
         }
+        // printf("\n");
+    }
+
+    for (int i = 1; i <= DEGREE - prefetched_addresses; ++i) {
+
+        Addr pf_addr = stat.mem_addr + BLOCK_SIZE * i;
+
+        if (!in_cache(pf_addr))
+            issue_prefetch(pf_addr);
     }
 }
 
@@ -140,5 +184,4 @@ void prefetch_complete(Addr addr) {
     /*
      * Called when a block requested by the prefetcher has been loaded.
      */
-    // printf("Hello, I am done");
 }
