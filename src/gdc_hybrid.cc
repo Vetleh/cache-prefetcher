@@ -1,37 +1,145 @@
-/*
- * A sample prefetcher which does sequential one-block lookahead.
- * This means that the prefetcher fetches the next block _after_ the one that
- * was just accessed. It also ignores requests to blocks already in the cache.
- */
-
 #include "interface.hh"
+#include "stdio.h"
+#include "stdlib.h"
 
-#define SIZE = 10;
+/*
+ * DISTANCE PREFETCHER: Hybrid version
+ * */
 
-// HYBRID
+#define SIZE 1024
+#define DEGREE 3
+#define WIDTH 3
+#define DEPTH 2
+
+void    ghb_add_entry(Addr addr);
+int16_t ait_get_prev_ghb_entry(Addr addr, bool sign);
+int16_t ghb_get_prev_entry(Addr addr);
+
+struct ghb_entry {
+    Addr    addr;
+    bool    valid;
+    int16_t prev;
+};
+
+struct ait_entry {
+    Addr    delta;
+    bool    sign;
+    bool    valid;
+    int16_t entry;
+};
+
+ghb_entry ghb[SIZE];
+int16_t   ghb_head = -1;
+
+ait_entry ait[SIZE];
 
 void prefetch_init(void) {
-    /* Called before any calls to prefetch_access. */
-    /* This is the place to initialize data structures. */
+    for (uint16_t i = 0; i < SIZE; i++) {
+        ghb[i].valid = false;
+        ghb[i].prev  = -1;
+    }
+    for (uint16_t i = 0; i < SIZE; i++)
+        ait[i].valid = false;
+}
 
-    // DPRINTF(HWPrefetch, "Initialized sequential-on-access prefetcher\n");
+int16_t ait_get_prev_ghb_entry(Addr delta, bool sign) {
+    uint16_t   hash    = delta % SIZE;
+    ait_entry *bucket  = &ait[hash];
+    uint16_t   b_delta = bucket->delta;
+    int16_t    b_entry = bucket->entry;
+    bool       b_valid = bucket->valid;
+    bool       b_sign  = bucket->sign;
+    bucket->delta      = delta;
+    bucket->sign       = sign;
+    bucket->entry      = ghb_head;
+    bucket->valid      = true;
+    if (b_valid && ghb[b_entry].valid && b_delta == delta && b_sign == sign)
+        return b_entry;
+    return -1;
+}
+
+void ghb_add_entry(Addr addr) {
+    int16_t tmp_head = ghb_head;
+    ghb_head         = (ghb_head + 1) % SIZE;
+
+    ghb_entry *entry = &ghb[ghb_head];
+    entry->valid     = false;
+
+    // Find prev entry
+    int16_t prev;
+    if (tmp_head != -1) {
+        Addr delta;
+        Addr tmp_addr = ghb[tmp_head].addr;
+        bool sign;
+        if (tmp_addr > addr) {
+            delta = tmp_addr - addr;
+            sign  = 0;
+        } else {
+            delta = addr - tmp_addr;
+            sign  = 1;
+        }
+        prev = ait_get_prev_ghb_entry(delta, sign);
+    } else {
+        prev = -1;
+    }
+
+    entry->prev  = prev;
+    entry->addr  = addr;
+    entry->valid = true;
 }
 
 void prefetch_access(AccessStat stat) {
-    /* pf_addr is now an address within the _next_ cache block */
-    Addr pf_addr = stat.mem_addr + BLOCK_SIZE;
-
     /*
-     * Issue a prefetch request if a demand miss occured,
-     * and the block is not already in cache.
-     */
-    if (stat.miss && !in_cache(pf_addr)) {
-        issue_prefetch(pf_addr);
+     * Traverse the linked list of previous occurences for the current candidate and fetch
+     * prefetch candidates up to the prefetch depth
+     * */
+    Addr addr = stat.mem_addr;
+    if (stat.miss) {
+        ghb_add_entry(addr);
+        int16_t prev = ghb[ghb_head].prev;
+        if (prev == -1) {
+            Addr    tmp_addr = addr;
+            uint8_t strided  = 0;
+            while (strided++ < DEGREE) {
+                tmp_addr += BLOCK_SIZE;
+                if (!in_cache(tmp_addr))
+                    issue_prefetch(tmp_addr);
+            }
+            return;
+        }
+        uint8_t width = 0;
+        uint8_t depth = 0;
+        Addr    prev_addr;
+        Addr    cand_addr;
+        Addr    delta;
+        bool    sign;
+        int16_t cand;
+        while (prev != -1 && width++ < WIDTH) {
+            prev_addr = ghb[prev].addr;
+            cand      = (prev + 1) % SIZE;
+            while (cand != ghb_head && depth++ < DEPTH) {
+                cand_addr = ghb[cand].addr;
+                cand      = (cand + 1) % SIZE;
+                prev      = ghb[prev].prev;
+                if (prev_addr > cand_addr) {
+                    delta = prev_addr - cand_addr;
+                    sign  = 0;
+                } else {
+                    delta = cand_addr - prev_addr;
+                    sign  = 1;
+                }
+                if (sign && addr + delta < MAX_PHYS_MEM_ADDR)
+                    addr += delta;
+                else if (!sign && addr > delta)
+                    addr -= delta;
+                // If delta causes underflow or overflow, do not prefetch
+                else
+                    continue;
+                if (!in_cache(addr))
+                    issue_prefetch(addr);
+            }
+        }
     }
 }
 
-void prefetch_complete(Addr addr) {
-    /*
-     * Called when a block requested by the prefetcher has been loaded.
-     */
-}
+void prefetch_complete(Addr addr) {}
