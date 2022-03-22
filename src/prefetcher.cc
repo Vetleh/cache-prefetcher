@@ -1,26 +1,17 @@
-/*
- * A sample prefetcher which does sequential one-block lookahead.
- * This means that the prefetcher fetches the next block _after_ the one that
- * was just accessed. It also ignores requests to blocks already in the cache.
- */
-
-// Debug command (TODO REMOVE)
-// make && clear && ./build/ALPHA_SE/m5.opt /opt/prefetcher/m5/configs/example/se.py --detailed --caches --l2cache --l2size=1MB
-// --prefetcher=policy=proxy --prefetcher=on_access=True
-
 #include "interface.hh"
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#define GHB_SIZE 512
-#define IT_SIZE 512
+#define GHB_SIZE 1024
+#define IT_SIZE 1024
 
-#define WIDTH 16
-#define DEPTH 16
-#define DEGREE 32
+#define WIDTH 4
+#define DEPTH 4
+#define DEGREE 4
 
-// Global History Buffer (GHB) Entry
+#define STRIDED true
+
+// GHB Entry
 struct ghb_entry {
     Addr adr;
     int  prev;
@@ -28,19 +19,25 @@ struct ghb_entry {
     bool valid;
 };
 
-// Index Table (IT) Entry
+// IT Entry
 struct it_entry {
     int ghb_index;
 };
 
+// GHB and IT
 ghb_entry ghb[GHB_SIZE];
 it_entry  it[IT_SIZE];
 
-// Points to head of GHB
+// // Function declarations
+// it_entry  access_it(_int delta);
+// __int128  calculate_delta(int index);
+// ghb_entry add_ghb_entry(Addr adr, __int128 delta);
+// int       get_prev_ghb_entry_with_same_delta(int index, __int128 delta);
+
+// GHB head pointer
 int head_index = -1;
 
-/* Called before any calls to prefetch_access. */
-/* This is the place to initialize data structures. */
+// Initializes datastructures used by the prefetcher
 void prefetch_init(void) {
 
     // Initializes the GHB
@@ -51,13 +48,15 @@ void prefetch_init(void) {
     }
 
     // Initializes the IT
-    for (int i = 0; i < IT_SIZE; ++i) {
+    for (int i = 0; i < IT_SIZE; ++i)
         it[i].ghb_index = -1;
-    }
 }
 
-// Calculates a delta value
-int calculate_delta(int index) {
+// Accesses the IT
+it_entry access_it(__int128 delta) { return it[(((delta / 64) % IT_SIZE) + IT_SIZE) % IT_SIZE]; }
+
+// Calculates a delta value from a GHB index
+__int128 calculate_delta(int index) {
 
     // Stops if one of the entries is the head
     if (index == head_index || index + 1 == head_index)
@@ -75,24 +74,25 @@ int calculate_delta(int index) {
     return b.adr - a.adr;
 }
 
-it_entry access_it(int delta) { return it[abs((delta / 64) % IT_SIZE)]; }
-
-int get_prev_ghb_entry_with_same_delta(int index, int delta) {
+// Gets the previous GHB entry that has the same delta value
+int get_prev_ghb_entry_with_same_delta(int index, __int128 delta) {
 
     // Checks the index table
     int ghb_index = access_it(delta).ghb_index;
-    if (ghb_index > 0) {
-        int delta_candidate = ghb[ghb_index].adr - ghb[(ghb_index - 1) % GHB_SIZE].adr;
-        if (delta == delta_candidate)
-            return ghb_index;
-    }
 
-    // TODO: Add for loop
+    if (ghb_index > 0) {
+        __int128 delta_candidate = ghb[ghb_index].adr - ghb[(ghb_index - 1) % GHB_SIZE].adr;
+        if (delta == delta_candidate) {
+            return ghb_index;
+        }
+    }
 
     return -1;
 }
 
-ghb_entry add_ghb_entry(Addr adr, int delta) {
+// Adds an entry into the GHB
+ghb_entry add_ghb_entry(Addr adr, __int128 delta) {
+
     // Increments the head index
     head_index = (head_index + 1) % GHB_SIZE;
 
@@ -113,22 +113,26 @@ ghb_entry add_ghb_entry(Addr adr, int delta) {
     ghb[prev].next = head_index;
 
     // Updates the index table
-    it[abs((delta / 64) % IT_SIZE)].ghb_index = head_index;
+    it[(((delta / 64) % IT_SIZE) + IT_SIZE) % IT_SIZE].ghb_index = head_index;
 
+    // Returns the added GHB entry
     return ghb[head_index];
 }
 
+// 2 -> 4 delta 2 (4 - 2)
 void prefetch_access(AccessStat stat) {
-    // printf("Hello, I am done");
     if (!stat.miss)
         return;
 
-    // Calculates the delta value
-    int delta = ghb[head_index].adr - stat.mem_addr;
+    // printf("\nMISS\n");
 
-    // Adds the ghb entry (updates the GHB and IT)
+    // Calculates the delta value
+    __int128 delta = stat.mem_addr - ghb[head_index].adr;
+
+    // Adds the GHB entry (i.e. updates the GHB and IT)
     ghb_entry node = add_ghb_entry(stat.mem_addr, delta);
 
+    // Amount of prefetched addresses
     int prefetched_addresses = 0;
 
     for (int i = 0; i < WIDTH; ++i) {
@@ -141,47 +145,55 @@ void prefetch_access(AccessStat stat) {
 
         Addr pf_addr = stat.mem_addr;
 
-        for (int j = 0; j < DEPTH; ++j) {
+        // printf("%d\n", current_index);
+
+        for (int j = 1; j <= DEPTH; ++j) {
 
             // Calculates the delta value
             delta = calculate_delta(current_index + j);
 
-            // Stops if no more nodes
+            // Stops if no more nodes (i.e. no delta)
             if (delta == -1)
                 break;
 
-            // Continues if address is too large
+            // Checks if address is too large or small after adding delta
             if (pf_addr + delta > MAX_PHYS_MEM_ADDR || pf_addr + delta < 0)
                 continue;
 
             // Adds the delta to the miss address
             pf_addr += delta;
 
-            // printf("%d\n", current_index + j);
+            // printf("%d", current_index + j);
 
-            // Issue a prefetch request if the address is not already in cache
+            // Issues a prefetch request if the address is not already in cache
             if (!in_cache(pf_addr)) {
+                // printf("[x]");
                 ++prefetched_addresses;
                 issue_prefetch(pf_addr);
             }
 
-            // Gets the next node
-            node = ghb[(current_index + j) % GHB_SIZE];
+            printf("\n");
+
+            // Stops when prefetcher degree limit is met
+            if (prefetched_addresses >= DEGREE)
+                return;
         }
         // printf("\n");
     }
 
-    for (int i = 1; i <= DEGREE - prefetched_addresses; ++i) {
+    // Performs strided prefetching
+    if (STRIDED) {
+        for (int i = 1; i <= DEGREE - prefetched_addresses; ++i) {
 
-        Addr pf_addr = stat.mem_addr + BLOCK_SIZE * i;
+            // Calculates the prefetch address
+            Addr pf_addr = stat.mem_addr + BLOCK_SIZE * i;
 
-        if (!in_cache(pf_addr))
-            issue_prefetch(pf_addr);
+            // Issues a prefetch request if the address is not already in cache
+            if (!in_cache(pf_addr))
+                issue_prefetch(pf_addr);
+        }
     }
 }
 
-void prefetch_complete(Addr addr) {
-    /*
-     * Called when a block requested by the prefetcher has been loaded.
-     */
-}
+// Called when a prefetch request completes
+void prefetch_complete(Addr addr) {}
