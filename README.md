@@ -30,12 +30,7 @@ indicates that the main performance bottleneck in modern computers is
 memory access latency, not the theoretical amount of Instructions Per
 Cycle (IPC) the processor can execute.
 
-<figure id="fig:mirror">
-<img src="assets/processor-memory-gap.jpg" style="width:9cm" />
-<figcaption>The memory wall represents the increasing gap between
-processor and memory performance <span class="citation"
-data-cites="b4"></span>.</figcaption>
-</figure>
+![](https://github.com/HakonHarnes/cache-prefetcher/blob/main/report/assets/processor-memory-gap.jpg)
 
 To compensate for this bottleneck multiple levels of high performance
 caches were introduced. These caches took advantage of the principles of
@@ -91,18 +86,12 @@ more silicone area on the chip. The GHB is depicted in
 <a href="#fig:GHB" data-reference-type="ref"
 data-reference="fig:GHB">2</a>.
 
-<figure id="fig:GHB">
-<img src="assets/GHB-prefetch-structure.png" style="width:6cm" />
-<figcaption>Global History Buffer that is indexed by an index table. The
-data in the GHB is used as input to the prefetch algorithm <span
-class="citation" data-cites="b1"></span>.</figcaption>
-</figure>
+![](https://github.com/HakonHarnes/cache-prefetcher/blob/main/report/assets/GHB-prefetch-structure.png)
 
 ## Index Table (IT)
 
 The Index Table (IT) is used to access the GHB, as seen in
-<a href="#fig:GHB" data-reference-type="ref"
-data-reference="fig:GHB">2</a>. The IT stores a list of key-pointer
+Figure 2. The IT stores a list of key-pointer
 pairs. The pointers in the IT point to the previous GHB entry associated
 with the same key. This decreases the overhead of accessing the GHB
 substantially.
@@ -118,11 +107,7 @@ with a miss address of A, and a correlation table as depicted in
 data-reference="fig:GHB">2</a>, Markov prefetching would prefetch the
 data in C and B.
 
-<figure id="fig:Markov">
-<img src="assets/markov-prefetch.png" style="width:62mm" />
-<figcaption>Markov prefetching <span class="citation"
-data-cites="b1"></span>.</figcaption>
-</figure>
+![](https://github.com/HakonHarnes/cache-prefetcher/blob/main/report/assets/markov-prefetch.png)
 
 ## Distance prefetching
 
@@ -135,11 +120,7 @@ improves on Markov’s high memory requirement. When combined with the GHB
 one can achieve even lower memory requirements without loosing the
 ability to recognize dynamic memory access patterns.
 
-<figure id="fig:Distance">
-<img src="assets/distance-prefetching.png" style="width:62mm" />
-<figcaption>Distance prefetching <span class="citation"
-data-cites="b1"></span>.</figcaption>
-</figure>
+![](https://github.com/HakonHarnes/cache-prefetcher/blob/main/report/assets/distance-prefetching.png)
 
 # Global Delta Correlation (D/DC)
 
@@ -172,11 +153,7 @@ prefetcher will act as a sequential prefetcher. This allows the
 prefetcher to keep fetching potentially useful data, even if there is no
 useful history present.
 
-<figure id="fig:GDC">
-<img src="assets/gdc.png" style="width:7cm" />
-<figcaption>Global Delta Correlation (G/DC) <span class="citation"
-data-cites="b1"></span>.</figcaption>
-</figure>
+![](https://github.com/HakonHarnes/cache-prefetcher/blob/main/report/assets/gdc.png)
 
 In this paper we have implemented three variants of the G/DC prefetcher:
 Width, depth and hybrid.
@@ -284,13 +261,15 @@ data-reference="tab:terminology">3</a>.
 | Good prefetch | The prefetched block is referenced by the application before it is replaced. |
 | Bad prefetch  | The prefetched block is replaced without being referenced                    |
 
-Terminology
+### Terminology
 
 </div>
 
 The speedup is is a commonly used proxy for overall performance. It
 measures the relative performance gain.
-$$\text{Speedup} = \frac{\text{IPC}_{\text{With prefetcher}\phantom{ou}}}{\text{IPC}_\text{Without prefetcher}}$$
+
+$$\text{Speedup} = \frac{\text{IPC}_{\text{With prefetcher}}}{\text{IPC}_\text{Without prefetcher}}$$
+
 The accuracy measures the number of useful prefetches issued by the
 prefetcher.
 $$\text{Accuracy} = \frac{\text{Good prefetches}}{\text{Total prefetches}}$$
@@ -322,11 +301,7 @@ achieve higher speedups than the all of the G/DC variants. This may be
 caused by the fact that DCPT-P and RPT are suited for recognizing
 strided memory access patterns , while G/DC is not.
 
-<figure id="fig:comparison">
-<img src="assets/comparison.png" style="width:90mm" />
-<figcaption>Average speedups for the different prefetcher algorithms.
-</figcaption>
-</figure>
+![](https://github.com/HakonHarnes/cache-prefetcher/blob/main/report/assets/comparison.png)
 
 As illustrated in <a href="#fig:tests" data-reference-type="ref"
 data-reference="fig:tests">7</a>, the three G/DC variants performs
@@ -343,10 +318,7 @@ FIFO nature of the GHB, causing older entries to be evicted. This
 indicates that the ammp test has a higher degree of delta-correlation in
 it than swim does.
 
-<figure id="fig:tests">
-<img src="assets/tests.png" style="width:90mm" />
-<figcaption>Speedup for the different benchmark tests.</figcaption>
-</figure>
+![](https://github.com/HakonHarnes/cache-prefetcher/blob/main/report/assets/tests.png)
 
 ## Parameters
 
@@ -366,10 +338,7 @@ findings show there is a clear trade-off between prefetching too much
 data, and not prefetching enough. The optimal prefetch degree in our
 implementation has been found to be four.
 
-<figure id="fig:speedup">
-<img src="assets/speedup.png" style="width:90mm" />
-<figcaption>Average speedup for different prefetch degrees.</figcaption>
-</figure>
+![](https://github.com/HakonHarnes/cache-prefetcher/blob/main/report/assets/speedup.png)
 
 The average speedup achieved with different GHB and IT sizes is shown in
 <a href="#fig:size" data-reference-type="ref"
@@ -387,10 +356,7 @@ higher the prefetcher degree, the higher the speedup. We did not find
 that, and therefore our tests have been conducted with prefetch degree
 four.
 
-<figure id="fig:size">
-<img src="assets/size.png" style="width:90mm" />
-<figcaption>Average speedup for different GHB and IT sizes.</figcaption>
-</figure>
+![](https://github.com/HakonHarnes/cache-prefetcher/blob/main/report/assets/size.png)
 
 # Discussion
 
