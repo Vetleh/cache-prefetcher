@@ -1,19 +1,29 @@
 # Cache Prefetcher
 
+This repository contains the implementation of the Global Delta Correlation (G/DC) prefetching algorithm with accompanying documentation and report. The project was developed as part of the TDT4260 course at NTNU. The report can be found ![here](https://github.com/HakonHarnes/cache-prefetcher/blob/main/report/main.pdf) as a PDF. If you prefer markdown, continue reading on. 
+
+## Repository Structure 
+
+- `report`: Contains the LaTeX source code, as well as a compiled pdf. 
+- `scripts`: Contains python scripts for testing the algorithm, as well as generating graphs. 
+- `src`: Contains the implementation of the algorithm. 
+
+--- 
+
 # Abstract
-  The advancements in processor performance in recent years by far
-  exceeds the improvements in memory access latency. Numerous techniques
-  have been developed to compensate for this, among others prefetching.
-  This paper presents a prefetching algorithm called Global Delta
-  Correlation (G/DC). G/DC is a correlation based distance prefetcher
-  that uses a Global History Buffer (GHB) to keep track of memory
-  accesses and an Index Table (IT) for faster look-ups into the GHB. The
-  M5 hardware simulator was used to simulate the prefetcher
-  implementation. The SPEC CPU2000 benchmark suite was used to evaluate
-  its performance against other prefetchers. The paper also compares the
-  three different implementations of the G/DC scheme, which is width,
-  depth and hybrid. We found the G/DC prefetcher was able to achieve an
-  average speedup of 5%.
+The advancements in processor performance in recent years by far
+exceeds the improvements in memory access latency. Numerous techniques
+have been developed to compensate for this, among others prefetching.
+This paper presents a prefetching algorithm called Global Delta
+Correlation (G/DC). G/DC is a correlation based distance prefetcher
+that uses a Global History Buffer (GHB) to keep track of memory
+accesses and an Index Table (IT) for faster look-ups into the GHB. The
+M5 hardware simulator was used to simulate the prefetcher
+implementation. The SPEC CPU2000 benchmark suite was used to evaluate
+its performance against other prefetchers. The paper also compares the
+three different implementations of the G/DC scheme, which is width,
+depth and hybrid. We found the G/DC prefetcher was able to achieve an
+average speedup of 5%.
 
 # Introduction
 
