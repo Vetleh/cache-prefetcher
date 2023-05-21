@@ -1,6 +1,6 @@
 # Cache Prefetcher
 
-This repository contains the implementation of the Global Delta Correlation (G/DC) prefetching algorithm with accompanying documentation and report. The project was developed as part of the TDT4260 course at NTNU. The report can be found ![here](https://github.com/HakonHarnes/cache-prefetcher/blob/main/report/main.pdf) as a PDF. If you prefer markdown, continue reading on. 
+This repository contains the implementation of the Global Delta Correlation (G/DC) prefetching algorithm with accompanying documentation and report. The project was developed as part of the TDT4260 course at NTNU. The report can be found ![here](https://github.com/Vetleh/cache-prefetcher/blob/main/report/main.pdf) as a PDF. If you prefer markdown, continue reading on. 
 
 ## Repository Structure 
 
